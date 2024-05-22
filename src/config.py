@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     PG_PASSWORD: str = ''
     PG_PORT: str = ''
     PG_DATABASE: str = ''
+    KEITARO_DOMAIN: str = ''
+    KEITARO_API_KEY: str = ''
 
     class Config:
         env_file = '../.env'
