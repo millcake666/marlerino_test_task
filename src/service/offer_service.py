@@ -9,8 +9,11 @@ class OfferService(DefaultService):
     def create(self):
         return
 
-    def keitaro_add(self):
+    def keitaro_create(self):
         return
 
     def get(self):
+        return
+
+    def keitaro_get(self):
         return

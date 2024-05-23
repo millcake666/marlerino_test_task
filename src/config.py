@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     PG_DATABASE: str = ''
     KEITARO_DOMAIN: str = ''
     KEITARO_API_KEY: str = ''
+    KEITARO_API_DOMAIN: str = ''
 
     class Config:
         env_file = '../.env'
