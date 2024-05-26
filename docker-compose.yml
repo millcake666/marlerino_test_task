@@ -32,7 +32,6 @@ services:
 
     network_mode: host
     build:
-      context: .
       dockerfile: ./src/Dockerfile
     depends_on:
       - postgres

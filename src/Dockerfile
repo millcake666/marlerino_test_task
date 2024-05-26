@@ -12,7 +12,6 @@ RUN \
 
 
 COPY ./src/ ./
-COPY ../.env ./
-EXPOSE 8000
+COPY .env ./.env
 
 CMD ["python", "main.py"]
