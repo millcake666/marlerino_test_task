@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     KEITARO_API_DOMAIN: str = ''
 
     class Config:
-        env_file = '../.env'
+        env_file = '.env'
 
     @property
     def database_url(self):

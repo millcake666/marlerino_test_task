@@ -3,7 +3,7 @@ from fastapi import HTTPException
 from service import DefaultService
 from config import get_settings
 from schemes import UserIn, UserOut
-from database import User
+from database import User, AffiliateNetwork
 
 
 settings = get_settings()
@@ -49,6 +49,12 @@ class UserService(DefaultService):
         if user:
             try:
                 self.session.delete(user)
+                for user_affiliate_network in user.affiliate_networks:
+                    user_affiliate_network: AffiliateNetwork
+                    self.session.delete(user_affiliate_network)
+                    for affiliate_network_offer in user_affiliate_network.offers:
+                        self.delete(affiliate_network_offer)
+
                 self.session.commit()
 
             except Exception as e:

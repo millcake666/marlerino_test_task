@@ -15,5 +15,29 @@ services:
       - "${PG_PORT}:5432"
 
 
+  api:
+    restart: always
+    environment:
+      APP_NAME: ${APP_NAME}
+      HOST: ${HOST}
+      PORT: ${PORT}
+      PG_HOST: ${PG_HOST}
+      PG_USER: ${PG_USER}
+      PG_PASSWORD: ${PG_PASSWORD}
+      PG_PORT: ${PG_PORT}
+      PG_DATABASE: ${PG_DATABASE}
+      KEITARO_DOMAIN: ${KEITARO_DOMAIN}
+      KEITARO_API_KEY: ${KEITARO_API_KEY}
+      KEITARO_API_DOMAIN: ${KEITARO_API_DOMAIN}
+
+    network_mode: host
+    build:
+      dockerfile: ./src/Dockerfile
+    depends_on:
+      - postgres
+    ports:
+      - "${PORT}:8000"
+
+
 volumes:
   postgresql-14:
