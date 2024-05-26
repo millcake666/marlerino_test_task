@@ -29,7 +29,7 @@ class AffiliateNetworkService(DefaultService):
                                                f'"{affiliate_network.name}" is already exist')
         else:
             raise HTTPException(status_code=500,
-                                detail='Error while adding affiliate network')
+                                detail='Failed to get response from Keitaro API')
 
         try:
             affiliate_network_model = AffiliateNetwork(**affiliate_network.model_dump())
@@ -53,20 +53,26 @@ class AffiliateNetworkService(DefaultService):
         return AffiliateNetworkOut.model_validate(affiliate_network_model)
 
     def keitaro_create(self, user_id: int, affiliate_network_id: int) -> AffiliateNetworkOut:
-        user = self.session.query(User).filter_by(id=user_id).one_or_none()
+        try:
+            user_model = self.session.query(User).filter_by(id=user_id).one_or_none()
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f'Internal server error while creating affiliate network in Keitaro. Detail - {e}'
+            )
 
-        if user is None:
+        if user_model is None:
             raise HTTPException(
                 status_code=404,
                 detail=f'User not found. The user with ID {user_id} does not exist.'
             )
 
-        for user_affiliate_network in user.affiliate_networks:
+        for user_affiliate_network in user_model.affiliate_networks:
             user_affiliate_network: AffiliateNetwork
 
             if user_affiliate_network.id == affiliate_network_id:
                 r = requests.post(
-                    url=f'{settings.KEITARO_DOMAIN}/admin_api/v1/affiliate_networks',
+                    url=f'{settings.KEITARO_DOMAIN}/{settings.KEITARO_API_DOMAIN}/affiliate_networks',
                     headers=keitaro_auth.headers_with_auth(),
                     json={
                         'name': user_affiliate_network.name,
@@ -84,9 +90,15 @@ class AffiliateNetworkService(DefaultService):
 
                     return AffiliateNetworkOut.model_validate(user_affiliate_network)
 
+                else:
+                    raise HTTPException(
+                        status_code=500,
+                        detail='Failed to get response from Keitaro API'
+                    )
+
     def get(self, affiliate_network_id: int) -> AffiliateNetworkOut:
         try:
-            affiliate_network = self.session.query(AffiliateNetwork).filter_by(id=affiliate_network_id).one_or_none()
+            affiliate_network_model = self.session.query(AffiliateNetwork).filter_by(id=affiliate_network_id).one_or_none()
 
         except Exception as e:
             raise HTTPException(
@@ -94,34 +106,40 @@ class AffiliateNetworkService(DefaultService):
                 detail=f'Internal server error while getting from db table AffiliateNetwork. Detail - {e}'
             )
 
-        if affiliate_network is None:
+        if affiliate_network_model is None:
             raise HTTPException(
                 status_code=404,
                 detail=f'AffiliateNetwork not found. '
                        f'The affiliate network with ID {affiliate_network_id} does not exist.'
             )
 
-        return AffiliateNetworkOut.model_validate(affiliate_network)
+        return AffiliateNetworkOut.model_validate(affiliate_network_model)
 
     def keitaro_get(self, affiliate_network_id: int) -> AffiliateNetworkOutFull:
-        affiliate_network = self.session.query(AffiliateNetwork).filter_by(
-            id=affiliate_network_id
-        ).one_or_none()
+        try:
+            affiliate_network_model = self.session.query(AffiliateNetwork).filter_by(
+                id=affiliate_network_id
+            ).one_or_none()
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f'Internal server error while getting from db table AffiliateNetwork. Detail - {e}'
+            )
 
-        if affiliate_network is None:
+        if affiliate_network_model is None:
             raise HTTPException(
                 status_code=404,
                 detail=f'AffiliateNetwork not found. '
                        f'The affiliate network with ID {affiliate_network_id} does not exist.'
             )
 
-        if affiliate_network.keitaro_id is None:
+        if affiliate_network_model.keitaro_id is None:
             raise HTTPException(
                 status_code=400,
                 detail=f'The affiliate network with ID {affiliate_network_id} was not created in Keitaro.'
             )
 
-        r = requests.get(f'{settings.KEITARO_DOMAIN}/admin_api/v1/affiliate_networks/{affiliate_network.keitaro_id}',
+        r = requests.get(f'{settings.KEITARO_DOMAIN}/admin_api/v1/affiliate_networks/{affiliate_network_model.keitaro_id}',
                          headers=keitaro_auth.headers_with_auth())
 
         if r.status_code == 200 and r.json() is not None:

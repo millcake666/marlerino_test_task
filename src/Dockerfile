@@ -13,5 +13,6 @@ RUN \
 
 COPY ./src/ ./
 COPY ../.env ./
+EXPOSE 8000
 
 CMD ["python", "main.py"]

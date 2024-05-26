@@ -10,7 +10,6 @@ from io import BytesIO
 import requests
 from service.keitaro_auth import KeitaroAuth
 
-
 settings = get_settings()
 keitaro_auth = KeitaroAuth()
 
@@ -26,44 +25,102 @@ class OfferService(DefaultService):
             for exist_offer_in_keitaro in exist_offers_in_keitaro:
                 if exist_offer_in_keitaro.get('name') == offer.name:
                     raise HTTPException(status_code=400, detail='This offer name is already exist in Keitaro')
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail='Failed to get response from Keitaro API'
+            )
 
-        offer_model = Offer(**offer.model_dump())
-        self.session.add(offer_model)
-        self.session.commit()
-        self.session.refresh(offer_model)
+        try:
+            offer_model = Offer(**offer.model_dump())
+            self.session.add(offer_model)
+            self.session.commit()
+            self.session.refresh(offer_model)
 
-        affiliate_network_model = self.session.query(AffiliateNetwork).filter_by(
-            id=offer.affiliate_network_id
-        ).one_or_none()
-        affiliate_network_to_offer_model = AffiliateNetworkToOffer(
-            affiliate_network_id=affiliate_network_model.id,
-            offer_id=offer_model.id
-        )
-        self.session.add(affiliate_network_to_offer_model)
-        self.session.commit()
-
-        return OfferOut.model_validate(offer_model)
+            affiliate_network_model = self.session.query(AffiliateNetwork).filter_by(
+                id=offer.affiliate_network_id
+            ).one_or_none()
+            affiliate_network_to_offer_model = AffiliateNetworkToOffer(
+                affiliate_network_id=affiliate_network_model.id,
+                offer_id=offer_model.id
+            )
+            self.session.add(affiliate_network_to_offer_model)
+            self.session.commit()
+            return OfferOut.model_validate(offer_model)
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f'Internal server error while creating AffiliateNetwork in db. Detail - {e}'
+            )
 
     async def upload_archive(self, offer_id: int, archive: UploadFile = File()):
-        offer = self.session.query(Offer).filter_by(id=offer_id).one_or_none()
-        file = await archive.read()
-        offer.archive = b64encode(file)
-        offer.archive_name = archive.filename
-        self.session.commit()
+        try:
+            offer_model = self.session.query(Offer).filter_by(id=offer_id).one_or_none()
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f'Internal server error while getting from db table Offer. Detail - {e}'
+            )
+
+        if offer_model is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f'Offer not found. '
+                       f'The Offer with ID {offer_id} does not exist.'
+            )
+
+        try:
+            file = await archive.read()
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f'Cannot read file. Error - {e}'
+            )
+
+        try:
+            offer_model.archive = b64encode(file)
+            offer_model.archive_name = archive.filename
+            self.session.commit()
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f'Error while adding in database. Detail - {e}'
+            )
 
     async def download_archive(self, offer_id: int) -> StreamingResponse:
-        offer = self.session.query(Offer).filter_by(id=offer_id).one_or_none()
-        bytes_archive = b64decode(offer.archive)
+        try:
+            offer_model = self.session.query(Offer).filter_by(id=offer_id).one_or_none()
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f'Internal server error while getting from db table Offer. Detail - {e}'
+            )
+
+        if offer_model is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f'Offer not found. '
+                       f'The Offer with ID {offer_id} does not exist.'
+            )
+
+        bytes_archive = b64decode(offer_model.archive)
         return StreamingResponse(
             content=BytesIO(bytes_archive),
             headers={
-                'Content-Disposition': f'attachment; filename="{offer.archive_name}"',
+                'Content-Disposition': f'attachment; filename="{offer_model.archive_name}"',
                 'Content-Length': str(len(bytes_archive))},
             media_type="application/zip")
 
     def keitaro_create(self, offer_id: int) -> OfferOut:
-        offer_model = self.session.query(Offer).filter_by(id=offer_id).one_or_none()
-        affiliate_network_model = self.session.query(AffiliateNetwork).filter_by(id=offer_model.affiliate_network_id).one_or_none()
+        try:
+            offer_model = self.session.query(Offer).filter_by(id=offer_id).one_or_none()
+            affiliate_network_model = self.session.query(AffiliateNetwork).filter_by(
+                id=offer_model.affiliate_network_id).one_or_none()
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f'Internal server error while getting from db table Offer and AffiliateNetwork. Detail - {e}'
+            )
 
         r_create_offer = requests.post(
             url=f'{settings.KEITARO_DOMAIN}/{settings.KEITARO_API_DOMAIN}/offers',
@@ -103,12 +160,36 @@ class OfferService(DefaultService):
 
             return OfferOut.model_validate(offer_model)
 
+        else:
+            raise HTTPException(status_code=500, detail='Failed to get response from Keitaro API')
+
     def get(self, offer_id: int) -> OfferOut:
-        offer_model = self.session.query(Offer).filter_by(id=offer_id).one_or_none()
+        try:
+            offer_model = self.session.query(Offer).filter_by(id=offer_id).one_or_none()
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f'Internal server error while getting from db table Offer. Detail - {e}'
+            )
+
+        if offer_model is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f'Offer not found. '
+                       f'The Offer with ID {offer_id} does not exist.'
+            )
+
         return OfferOut.model_validate(offer_model)
 
     def keitaro_get(self, offer_id: int):
-        offer_model = self.session.query(Offer).filter_by(id=offer_id).one_or_none()
+        try:
+            offer_model = self.session.query(Offer).filter_by(id=offer_id).one_or_none()
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f'Internal server error while getting from db table Offer. Detail - {e}'
+            )
+
         if offer_model is None:
             raise HTTPException(
                 status_code=404,
@@ -125,3 +206,6 @@ class OfferService(DefaultService):
             offer_in_keitaro['keitaro_id'] = offer_in_keitaro.get('id')
             offer_in_keitaro['id'] = offer_id
             return OfferOut.model_validate(offer_in_keitaro)
+
+        else:
+            raise HTTPException(status_code=500, detail='Failed to get response from Keitaro API')
